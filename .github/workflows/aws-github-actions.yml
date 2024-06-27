@@ -23,6 +23,6 @@ jobs:
           role-session-name: samplerolesession
           aws-region: ${{ env.AWS_REGION }}
       # Upload a file to AWS s3
-      - name:  Copy index.html to s3
+      - name:  Copy file to s3
         run: |
-          aws s3 cp ./index.html s3://${{ env.BUCKET_NAME }}/
+          aws s3 cp ./ s3://${{ env.BUCKET_NAME }}/ --recursive --exclude ".git/*" --exclude ".github/*"
