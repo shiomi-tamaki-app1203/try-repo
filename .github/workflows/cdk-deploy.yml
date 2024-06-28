@@ -1,0 +1,53 @@
+name: CDK Deploy
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  cdk-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16
+          registry-url: https://npm.pkg.github.com/
+      - name: Install AWS CDK
+        run: npm ci
+      - name: Destination settings for dev enviroment
+        if: (github.ref == 'refs/heads/develop') || (github.event.pull_request.base.ref == 'develop')
+        run: |
+          echo "Using dev environment settings."
+          echo "AWS_ACCOUNT=${{secrets.AWS_ACCOUNT_DEV}}" >> $GITHUB_ENV
+          echo "AWS_REGION=${{secrets.AWS_REGION_DEV}}" >> $GITHUB_ENV
+      - name: Destination settings for prd enviroment
+        if: (github.ref == 'refs/heads/main') || (github.event.pull_request.base.ref == 'main')
+        run: |
+          echo "Using prd environment settings."
+          echo "AWS_ACCOUNT=${{secrets.AWS_ACCOUNT_PRD}}" >> $GITHUB_ENV
+          echo "AWS_REGION=${{secrets.AWS_REGION_PRD}}" >> $GITHUB_ENV
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::${{env.AWS_ACCOUNT}}:role/${{github.event.repository.name}}-actions-role
+          aws-region: ${{env.AWS_REGION}}
+      - name: CDK Diff
+        if: contains(github.event_name, 'pull_request') || contains(github.event_name, 'push')
+        run: npm run cdk -- diff
+      - name: CDK Deploy
+        if: contains(github.event_name, 'push')
+        run: npm run cdk -- deploy --require-approval never
+

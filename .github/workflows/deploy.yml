@@ -1,21 +1,27 @@
-name: Deploy CDK Stack
+name: Deploy to Production
 
 on:
   push:
     branches:
       - main
 
-permissions:
-  id-token: write   # 必須
-  contents: read    # 必須
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v2
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        role-to-assume: arn:aws:iam::654654268093:role/administrator
+        aws-region: ap-northeast-1
 
     - name: Set up Node.js
       uses: actions/setup-node@v2
@@ -25,16 +31,12 @@ jobs:
     - name: Install dependencies
       run: npm install
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        role-to-assume: ${{ secrets.IAM_ROLE_ARN }}
-        role-session-name: GitHubActionsSession
-        aws-region: ap-northeast-1
+    - name: Build project
+      run: npm run build
 
-    - name: Bootstrap CDK
-      run: npx cdk bootstrap aws://654654268093/ap-northeast-1
+    - name: Sync S3 bucket
+      run: aws s3 sync ./build s3://your-bucket-name --delete
 
-    - name: Deploy CDK Stack
-      run: npx cdk deploy --require-approval never
+    - name: Invalidate CloudFront cache
+      run: aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/*"
 
